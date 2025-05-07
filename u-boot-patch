@@ -1,0 +1,65 @@
+diff --git a/arch/arm/dts/telechips/tcc807x/tcc807x-subcore.dts b/arch/arm/dts/telechips/tcc807x/tcc807x-subcore.dts
+index da32da1664..992799a874 100644
+--- a/arch/arm/dts/telechips/tcc807x/tcc807x-subcore.dts
++++ b/arch/arm/dts/telechips/tcc807x/tcc807x-subcore.dts
+@@ -20,7 +20,7 @@
+ 
+ 	memory: memory {
+ 		device_type = "memory";
+-		reg = <0x40000000 0x40000000>;
++		reg = <0x40000000 0x20000000>;
+ 	};
+ 
+ 	firmware: firmware {
+diff --git a/cmd/boot.c b/cmd/boot.c
+index be67a5980d..9689588593 100644
+--- a/cmd/boot.c
++++ b/cmd/boot.c
+@@ -10,6 +10,7 @@
+ #include <command.h>
+ #include <net.h>
+ #include <vsprintf.h>
++#include <asm/u-boot-arm.h>
+
+@@ -34,6 +35,12 @@ static int do_go(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+        printf ("## Starting application at 0x%08lX ...\n", addr);
+        flush();
+ 
++	cleanup_before_linux();
++	
++	armv8_switch_to_el1(0x28000000, 0, 0, 0,
++			    addr,
++			    ES_TO_AARCH64);
+ 	/*
+ 	 * pass address parameter as argv[0] (aka command name),
+ 	 * and all remaining args
+diff --git a/include/configs/telechips/boot_telechips.h b/include/configs/telechips/boot_telechips.h
+index 7589fc7db8..2553240bc3 100644
+--- a/include/configs/telechips/boot_telechips.h
++++ b/include/configs/telechips/boot_telechips.h
+@@ -43,11 +43,7 @@
+ 	"blkread image ${bootpart}${_slot} ${kerneladdr}"
+ #else
+ #define COMMAND_LOADIMG \
+-	"blkread info ${rootpart}${_slot} root_devnum root_partnum; " \
+-	"if test $? -eq 0; then " \
+-		"env set bootargs ${bootargs} root=" ROOT_DEV " rootwait; " \
+-	"fi; " \
+-	"blkread image ${bootpart}${_slot} ${kerneladdr}"
++	"blkread part ${bootpart} ${kerneladdr}"
+ #endif
+ 
+ #define COMMAND_LOADFDT \
+@@ -57,11 +53,7 @@
+ 	"fdt addr ${fdt_addr}; fdt resize"
+ 
+ #define COMMAND_BOOTKERNEL \
+-	"if ${first_try}; then " \
+-		"env set bootargs \"${bootargs} bootreason=${boot_reason}\"; " \
+-		"env set first_try false; " \
+-	"fi; " \
+-	"bootm ${kerneladdr} - ${fdt_addr}"
++	"go ${kerneladdr}"
+ 
+ /*
+  * Command: fastbootcmd

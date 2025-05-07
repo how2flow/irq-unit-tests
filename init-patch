@@ -1,0 +1,108 @@
+commit aebc1973fd8c44cd269898c8e3f9058d8f5b0b42
+Author: 정광현 (Steve Jeong) <steve.jeong@telechips.com>
+Date:   Thu Apr 24 14:54:28 2025 +0900
+
+    for TEST
+
+diff --git a/arm/micro-bench.c b/arm/micro-bench.c
+index 22408955..4bef7423 100644
+--- a/arm/micro-bench.c
++++ b/arm/micro-bench.c
+@@ -306,14 +306,14 @@ struct exit_test {
+ };
+ 
+ static struct exit_test tests[] = {
+-	{"hvc",			NULL,			hvc_exec,		NULL,		65536,		true},
++	{"hvc",			NULL,			hvc_exec,		NULL,		65536,		false},
+ 	{"mmio_read_user",	mmio_read_user_prep,	mmio_read_user_exec,	NULL,		65536,		true},
+ 	{"mmio_read_vgic",	NULL,			mmio_read_vgic_exec,	NULL,		65536,		true},
+ 	{"eoi",			NULL,			eoi_exec,		NULL,		65536,		true},
+ 	{"ipi",			ipi_prep,		ipi_exec,		NULL,		65536,		true},
+ 	{"ipi_hw",		ipi_hw_prep,		ipi_exec,		NULL,		65536,		true},
+ 	{"lpi",			lpi_prep,		lpi_exec,		NULL,		65536,		true},
+-	{"timer_10ms",		timer_prep,		timer_exec,		timer_post,	256,		true},
++	{"timer_10ms",		timer_prep,		timer_exec,		timer_post,	256,		false},
+ };
+ 
+ struct ns_time {
+@@ -369,8 +369,8 @@ static void loop_test(struct exit_test *test)
+ 	avg_ns.ns = total_ns.ns / ntimes;
+ 	avg_ns.ns_frac = total_ns.ns_frac / ntimes;
+ 
+-	printf("%-30s%15" PRId64 ".%-15" PRId64 "%15" PRId64 ".%-15" PRId64 "\n",
+-		test->name, total_ns.ns, total_ns.ns_frac, avg_ns.ns, avg_ns.ns_frac);
++	printf("%lu.%lu",
++			avg_ns.ns, avg_ns.ns_frac);
+ }
+ 
+ static void parse_args(int argc, char **argv)
+@@ -399,10 +399,10 @@ int main(int argc, char **argv)
+ 	if (!test_init())
+ 		return 1;
+ 
+-	printf("\n%-30s%18s%13s%18s%13s\n", "name", "total ns", "", "avg ns", "");
+-	for (i = 0 ; i < 92; ++i)
+-		printf("%c", '-');
+-	printf("\n");
++//	printf("\n%-30s%18s%13s%18s%13s\n", "name", "total ns", "", "avg ns", "");
++//	for (i = 0 ; i < 92; ++i)
++//		printf("%c", '-');
++//	printf("\n");
+ 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
+ 		if (!tests[i].run)
+ 			continue;
+diff --git a/configure b/configure
+index 20bf5042..744ed570 100755
+--- a/configure
++++ b/configure
+@@ -15,7 +15,7 @@ function get_default_processor()
+         echo "cortex-a15"
+         ;;
+     "arm64")
+-        echo "cortex-a57"
++        echo "cortex-a76"
+         ;;
+     *)
+         echo "$arch"
+@@ -378,6 +378,8 @@ elif [ "$arch" = "arm" ] || [ "$arch" = "arm64" ]; then
+         : "${uart_early_addr:=0x9000000}"
+     elif [ "$target" = "kvmtool" ]; then
+         : "${uart_early_addr:=0x1000000}"
++    elif [ "$target" = "tcc" ]; then
++        : "${uart_early_addr:=0x16600000}"
+         errata_force=1
+     else
+         echo "--target must be one of 'qemu' or 'kvmtool'!"
+diff --git a/lib/arm/gic-v3.c b/lib/arm/gic-v3.c
+index 2f7870ab..9e84053c 100644
+--- a/lib/arm/gic-v3.c
++++ b/lib/arm/gic-v3.c
+@@ -48,7 +48,7 @@ void gicv3_enable_defaults(void)
+ 	gicv3_dist_wait_for_rwp();
+ 
+ 	for (i = 0; i < gicv3_data.irq_nr; i += 4)
+-		writel(~0, dist + GICD_IGROUPR + i);
++		writel(~0, dist + GICD_IGROUPR + i / 8);
+ 
+ 	if (!gicv3_redist_base())
+ 		gicv3_set_redist_base(SZ_64K * 2);
+diff --git a/lib/arm/gic.c b/lib/arm/gic.c
+index af43a96d..93e9577d 100644
+--- a/lib/arm/gic.c
++++ b/lib/arm/gic.c
+@@ -102,13 +102,13 @@ gic_get_dt_bases(const char *compatible, void **base1, void **base2, void **base
+ 
+ int gicv2_init(void)
+ {
+-	return gic_get_dt_bases("arm,cortex-a15-gic",
++	return gic_get_dt_bases("arm,gic-400",
+ 			&gicv2_data.dist_base, &gicv2_data.cpu_base, NULL);
+ }
+ 
+ int gicv3_init(void)
+ {
+-	return gic_get_dt_bases("arm,gic-v3", &gicv3_data.dist_base,
++	return gic_get_dt_bases("arm,gic-600", &gicv3_data.dist_base,
+ 			&gicv3_data.redist_bases[0], &its_data.base);
+ }
+ 

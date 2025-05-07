@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+if [ -z "$KUT_STANDALONE" ]; then
+	if [ ! -f config.mak ]; then
+		echo "run ./configure && make first. See ./configure -h"
+		exit 2
+	fi
+	source config.mak
+	source scripts/arch-run.bash
+fi
+
+# Allow user overrides of some config.mak variables
+mach=$MACHINE_OVERRIDE
+qemu_cpu=$TARGET_CPU_OVERRIDE
+firmware=$FIRMWARE_OVERRIDE
+
+: "${mach:=virt}"
+: "${qemu_cpu:=$TARGET_CPU}"
+: "${qemu_cpu:=$DEFAULT_QEMU_CPU}"
+: "${firmware:=$FIRMWARE}"
+[ "$firmware" ] && firmware="-bios $firmware"
+
+set_qemu_accelerator || exit $?
+[ "$ACCEL" = "kvm" ] && QEMU_ARCH=$HOST
+acc="-accel $ACCEL$ACCEL_PROPS"
+
+qemu=$(search_qemu_binary) || exit $?
+if [ "$mach" = 'virt' ] && ! $qemu -machine '?' | grep -q 'RISC-V VirtIO board'; then
+	echo "$qemu doesn't support mach-virt ('-machine virt'). Exiting."
+	exit 2
+fi
+mach="-machine $mach"
+
+command="$qemu -nodefaults -nographic -serial mon:stdio"
+command+=" $mach $acc $firmware -cpu $qemu_cpu "
+command="$(migration_cmd) $(timeout_cmd) $command"
+
+if [ "$UEFI_SHELL_RUN" = "y" ]; then
+	ENVIRON_DEFAULT=n run_qemu_status $command "$@"
+else
+	# We return the exit code via stdout, not via the QEMU return code
+	run_qemu_status $command -kernel "$@"
+fi
